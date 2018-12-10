@@ -173,7 +173,7 @@ class S2S(nn.Module):
                     beam_candidates.append((output_prob, output_seq, prev_h))
 
             # sort and add top candidate to beam
-            sorted_beams = sorted(beam_candidates, key=lambda tup: tup[0])
+            sorted_beams = sorted(beam_candidates, key=lambda tup: tup[0], reverse=True)
 
             for x in range(beam_size):
                 beams.append(sorted_beams[beam_size])
