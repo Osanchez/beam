@@ -116,9 +116,6 @@ class S2S(nn.Module):
             output_seq.append(argmax_pred.numpy())
             output_prob += argmax_prob
 
-            print((output_prob, seq, hn))
-            print()
-
             # now use the argmax prediction as the input to the next time step
             prev_char = argmax_pred
 
@@ -164,31 +161,25 @@ class S2S(nn.Module):
         # fill out the rest of the beam search!
         # the greedy_search code might be helpful to look at and understand!
 
-            pred_dist, prev_h = self.single_decoder_step(prev_char, prev_h)
+                pred_dist, prev_h = self.single_decoder_step(prev_char, prev_h)
+                _, top_indices = torch.sort(-pred_dist)  # sort in descending order (log domain)
 
-            _, top_indices = torch.sort(-pred_dist)  # sort in descending order (log domain)
+                # in beam search, we will look at all candidates
+                argmax_preds = top_indices
 
-            argmax_preds = top_indices
+                #expand each candidate and add to list of candidates
+                for argmax_pred in argmax_preds:
+                    curr_prob += pred_dist[argmax_pred]
+                    seq += [argmax_pred]
+                    beam_candidates.append((curr_prob, seq, prev_h))
 
-            # expand each candidate
-            output_prob = 0.
+        #sort and add top candidates to beam
+        sorted_beams = sorted(beam_candidates, key=lambda tup: tup[0])
 
-            for argmax_pred in argmax_preds:
-                argmax_prob = pred_dist[argmax_pred]
-                output_prob += argmax_prob
-                seq.append(argmax_pred)
-                print((output_prob, seq, prev_h))
-                print()
+        for x in range(beam_size):
+            beams.append(sorted_beams[x])
 
-            beam_candidates.append((output_prob, seq, prev_h))
-
-            # sort the beam candidates before adding top results to beams
-            sorted(beam_candidates, key=lambda tup: tup[0])
-
-            # add top beam candidates to beam
-            beams.append(beam_candidates[0:beam_size])
-
-        return beams
+        return beams[1:]
 
     def beam_check(self, seq):
         beams = self.beam_search(seq.expand(1, seq.size()[1]), beam_size=1)
@@ -196,9 +187,9 @@ class S2S(nn.Module):
         beam_prob = beams[0][0]
         beam_out = [np.array(c) for c in beams[0][1]]
 
+        #beams[0][0] == greedy_prob
+        #torch.allclose(beams[0][0], greedy_prob
         if beams[0][0] == greedy_prob and greedy_out == beam_out:
             return True
         else: 
             return False
-
-
