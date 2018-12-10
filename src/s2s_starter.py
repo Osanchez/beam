@@ -164,20 +164,24 @@ class S2S(nn.Module):
                 pred_dist, prev_h = self.single_decoder_step(prev_char, prev_h)
                 _, top_indices = torch.sort(-pred_dist)  # sort in descending order (log domain)
 
-                # in beam search, we will look at all candidates
+                # in beam search, we will get all candidates
                 argmax_preds = top_indices
 
-                #expand each candidate and add to list of candidates
+                # expand each candidate and add to list of candidates
                 for argmax_pred in argmax_preds:
-                    curr_prob += pred_dist[argmax_pred]
-                    seq += [argmax_pred]
-                    beam_candidates.append((curr_prob, seq, prev_h))
+                    output_prob = curr_prob
+                    output_prob += pred_dist[argmax_pred]
 
-        #sort and add top candidates to beam
-        sorted_beams = sorted(beam_candidates, key=lambda tup: tup[0])
+                    output_seq = list(seq)
+                    output_seq.append(argmax_pred)
 
-        for x in range(beam_size):
-            beams.append(sorted_beams[x])
+                    beam_candidates.append((output_prob, output_seq, prev_h))
+
+            # sort and add top candidate to beam
+            sorted_beams = sorted(beam_candidates, key=lambda tup: tup[0])
+            beams.append(sorted_beams[0])
+
+            beam_candidates.clear()
 
         return beams[1:]
 
