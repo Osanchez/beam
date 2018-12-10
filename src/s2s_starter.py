@@ -18,14 +18,13 @@ class S2S(nn.Module):
         # encoder and decoder RNNs
         self.encoder = nn.RNN(d_char, d_hid, num_layers=1, batch_first=True)
         self.decoder = nn.RNN(d_char, d_hid, num_layers=1, batch_first=True)
-        
+
         # output layer (softmax will be applied after this)
         self.out = nn.Linear(d_hid, len_voc)
 
-    
     # perform forward propagation of S2S model
     def forward(self, inputs, outputs):
-        
+
         bsz, max_len = inputs.size()
 
         # get embeddings of inputs
@@ -33,10 +32,10 @@ class S2S(nn.Module):
 
         # encode input sentence and extract final hidden state of encoder RNN
         _, final_enc_hiddens = self.encoder(embs)
-                
+
         # initialize decoder hidden to final encoder hiddens
         hn = final_enc_hiddens
-        
+
         # store all decoder states in here
         decoder_states = torch.zeros(max_len, bsz, self.d_hid)
 
@@ -44,9 +43,9 @@ class S2S(nn.Module):
         for idx in range(max_len):
 
             # store the previous character if there was one
-            prev_chars = None 
+            prev_chars = None
             if idx > 0:
-                prev_chars = outputs[:, idx - 1] # during training, we use the ground-truth previous char
+                prev_chars = outputs[:, idx - 1]  # during training, we use the ground-truth previous char
 
             # feed previous hidden state and previous char to decoder to get current hidden state
             if idx == 0:
@@ -59,15 +58,14 @@ class S2S(nn.Module):
 
             # feed to decoder rnn and store hidden state in decoder states
             _, hn = self.decoder(decoder_input, hn)
-            decoder_states[idx] = hn 
+            decoder_states[idx] = hn
 
-        # now do prediction over decoder states (reshape to 2d first)
+            # now do prediction over decoder states (reshape to 2d first)
         decoder_states = decoder_states.transpose(0, 1).contiguous().view(-1, self.d_hid)
         decoder_preds = self.out(decoder_states)
         decoder_preds = torch.nn.functional.log_softmax(decoder_preds, dim=1)
 
         return decoder_preds
-
 
     # given a previous character and a previous hidden state
     # produce a probability distribution over the entire vocabulary
@@ -85,14 +83,13 @@ class S2S(nn.Module):
         pred_dist = torch.nn.functional.log_softmax(pred_dist, dim=1)
         return pred_dist.view(-1), hn
 
-
     # greedy search for one input sequence (bsz = 1)
     def greedy_search(self, seq):
 
         bsz, max_len = seq.size()
 
-        output_seq = [] # this will contain our output sequence
-        output_prob = 0. # and this will be the probability of that sequence
+        output_seq = []  # this will contain our output sequence
+        output_prob = 0.  # and this will be the probability of that sequence
 
         # get embeddings of inputs
         embs = self.char_embs(seq)
@@ -103,12 +100,11 @@ class S2S(nn.Module):
         # initialize decoder hidden to final encoder hidden
         hn = final_enc_hidden
         prev_char = None
-        
+
         # now decode one character at a time
         for idx in range(max_len):
-
             pred_dist, hn = self.single_decoder_step(prev_char, hn)
-            _, top_indices = torch.sort(-pred_dist) # sort in descending order (log domain)
+            _, top_indices = torch.sort(-pred_dist)  # sort in descending order (log domain)
 
             # in greedy search, we will just use the argmax prediction at each time step
             argmax_pred = top_indices[0]
@@ -120,7 +116,6 @@ class S2S(nn.Module):
             prev_char = argmax_pred
 
         return output_prob, output_seq
-
 
     # beam search for one input sequence (bsz = 1)
     # YOUR JOB: FILL THIS OUT!!! SOME SPECIFICATION:
@@ -137,7 +132,7 @@ class S2S(nn.Module):
 
         # encode input sentence and extract final hidden state of encoder RNN
         _, final_enc_hidden = self.encoder(embs)
-        
+
         # this list will contain our k beams
         # you might find it helpful to store three things:
         #       (prob of beam, all chars in beam so far, prev hidden state)
@@ -158,8 +153,8 @@ class S2S(nn.Module):
                 else:
                     prev_char = seq[-1]
 
-        # fill out the rest of the beam search!
-        # the greedy_search code might be helpful to look at and understand!
+            # fill out the rest of the beam search!
+            # the greedy_search code might be helpful to look at and understand!
 
                 pred_dist, prev_h = self.single_decoder_step(prev_char, prev_h)
                 _, top_indices = torch.sort(-pred_dist)  # sort in descending order (log domain)
@@ -179,7 +174,9 @@ class S2S(nn.Module):
 
             # sort and add top candidate to beam
             sorted_beams = sorted(beam_candidates, key=lambda tup: tup[0])
-            beams.append(sorted_beams[0])
+
+            for x in range(beam_size):
+                beams.append(sorted_beams[beam_size])
 
             beam_candidates.clear()
 
@@ -191,9 +188,9 @@ class S2S(nn.Module):
         beam_prob = beams[0][0]
         beam_out = [np.array(c) for c in beams[0][1]]
 
-        #beams[0][0] == greedy_prob
-        #torch.allclose(beams[0][0], greedy_prob
+        # beams[0][0] == greedy_prob
+        # torch.allclose(beams[0][0], greedy_prob
         if beams[0][0] == greedy_prob and greedy_out == beam_out:
             return True
-        else: 
+        else:
             return False
